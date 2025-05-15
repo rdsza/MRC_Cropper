@@ -83,16 +83,23 @@ def extract_box(
             # Create a local variable for the data to avoid modifying mrc.data
             data = mrc.data
             
-            # Try to squeeze the data to handle dimensions of size 1
-            if len(original_shape) != 2:
+            # Handle data dimensionality
+            if len(original_shape) == 2:
+                # Already 2D, no need to squeeze
+                logger.debug("Input is already a 2D image")
+            elif len(original_shape) == 3:
+                # Try to squeeze 3D data to 2D
                 data = data.squeeze()
-                # Verify that the squeezed result is 2D
                 if len(data.shape) != 2:
                     raise ValueError(
-                        f"Cannot convert data to 2D image. Original shape: {original_shape}, "
-                        f"after squeeze: {data.shape}"
+                        f"Cannot convert 3D data to 2D image. Original shape: {original_shape}, "
+                        f"after squeeze: {data.shape}. One dimension must be of size 1."
                     )
-                logger.debug(f"Squeezed data to shape {data.shape}")
+                logger.debug(f"Squeezed 3D data to 2D shape {data.shape}")
+            else:
+                raise ValueError(
+                    f"Unsupported data dimensionality: {original_shape}. Only 2D images or 3D volumes with one dimension of size 1 are supported."
+                )
             
             image_height, image_width = data.shape
             logger.debug(f"Image dimensions: {image_width} x {image_height}")
