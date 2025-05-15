@@ -89,7 +89,7 @@ def extract_box(
                 logger.debug("Input is already a 2D image")
             elif len(original_shape) == 3:
                 # Try to squeeze 3D data to 2D
-                data = data.squeeze()
+                data = data.squeeze(axis=0)
                 if len(data.shape) != 2:
                     raise ValueError(
                         f"Cannot convert 3D data to 2D image. Original shape: {original_shape}, "
