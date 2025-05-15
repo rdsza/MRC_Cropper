@@ -76,7 +76,11 @@ def extract_box(
     try:
         with mrcfile.open(mrc_path, mode="r", permissive=True) as mrc:
             # Verify that this is a 2D image
-            if len(mrc.data.shape) != 2:
+            if len(mrc.data.shape) ==3:
+                # If the data is 3D, squeeze it to 2D
+                mrc.data = mrc.data.squeeze()
+            elif len(mrc.data.shape) != 2:
+                # If the data is not 2D, raise an error
                 raise ValueError(
                     f"Expected 2D image, but got {len(mrc.data.shape)}D data with shape {mrc.data.shape}"
                 )
