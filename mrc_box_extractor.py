@@ -78,19 +78,23 @@ def extract_box(
             # Verify that this is a 2D image
             # Check and handle data dimensionality
             original_shape = mrc.data.shape
+            logger.debug(f"Original data has shape {original_shape}")
+            
+            # Create a local variable for the data to avoid modifying mrc.data
+            data = mrc.data
+            
+            # Try to squeeze the data to handle dimensions of size 1
             if len(original_shape) != 2:
-                logger.debug(f"Original data has shape {original_shape}")
-                # Try to squeeze the data to handle dimensions of size 1
-                mrc.data = mrc.data.squeeze()
+                data = data.squeeze()
                 # Verify that the squeezed result is 2D
-                if len(mrc.data.shape) != 2:
+                if len(data.shape) != 2:
                     raise ValueError(
                         f"Cannot convert data to 2D image. Original shape: {original_shape}, "
-                        f"after squeeze: {mrc.data.shape}"
+                        f"after squeeze: {data.shape}"
                     )
-                logger.debug(f"Squeezed data to shape {mrc.data.shape}")
-
-            image_height, image_width = mrc.data.shape
+                logger.debug(f"Squeezed data to shape {data.shape}")
+            
+            image_height, image_width = data.shape
             logger.debug(f"Image dimensions: {image_width} x {image_height}")
 
             # Calculate box boundaries
