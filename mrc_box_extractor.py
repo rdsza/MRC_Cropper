@@ -81,7 +81,7 @@ def extract_box(
             logger.debug(f"Original data has shape {original_shape}")
             
             # Create a local variable for the data to avoid modifying mrc.data
-            image_data = mrc.data
+            image_data = mrc.data.copy()
             
             # Handle data dimensionality
             if len(original_shape) == 2:
@@ -93,16 +93,31 @@ def extract_box(
                 
                 if len(singleton_axes) == 1:
                     # If exactly one singleton dimension, safe to squeeze all
-                    image_data = image_data.squeeze()
+                    image_data = np.squeeze(image_data)
                     logger.debug(f"Squeezed 3D data to 2D shape {image_data.shape}")
                 elif len(singleton_axes) > 1:
-                    # If multiple singleton dimensions, squeeze just one to ensure 2D result
-                    image_data = np.squeeze(image_data, axis=singleton_axes[0])
-                    logger.debug(f"Squeezed one singleton dimension to get shape {image_data.shape}")
-                    if len(image_data.shape) != 2:
+                    # Try squeezing each singleton dimension to see if it produces a 2D result
+                    found_2d = False
+                    for axis in singleton_axes:
+                        test_data = np.squeeze(image_data, axis=axis)
+                        if len(test_data.shape) == 2:
+                            image_data = test_data
+                            found_2d = True
+                            logger.debug(f"Squeezed axis {axis} to get 2D shape {image_data.shape}")
+                            break
+                    
+                    if not found_2d:
+                        # Try squeezing all singleton dimensions
+                        test_data = np.squeeze(image_data)
+                        if len(test_data.shape) == 2:
+                            image_data = test_data
+                            found_2d = True
+                            logger.debug(f"Squeezed all singleton dimensions to get 2D shape {image_data.shape}")
+                    
+                    if not found_2d:
                         raise ValueError(
-                            f"Cannot convert 3D data to 2D image. Original shape: {original_shape}, "
-                            f"after partial squeeze: {image_data.shape}."
+                            f"Cannot convert 3D data to 2D image. Original shape: {original_shape}. "
+                            f"No combination of squeeze operations produces a 2D result."
                         )
                 else:
                     raise ValueError(
@@ -110,9 +125,15 @@ def extract_box(
                         f"No singleton dimensions found."
                     )
             else:
-                raise ValueError(
-                    f"Unsupported data dimensionality: {original_shape}. Only 2D images or 3D volumes with one dimension of size 1 are supported."
-                )
+                # For higher dimensionality, try squeezing all singleton dimensions
+                squeezed_data = np.squeeze(image_data)
+                if len(squeezed_data.shape) == 2:
+                    image_data = squeezed_data
+                    logger.debug(f"Squeezed {len(original_shape)}D data to 2D shape {image_data.shape}")
+                else:
+                    raise ValueError(
+                        f"Unsupported data dimensionality: {original_shape}. Cannot convert to 2D image."
+                    )
             
             image_height, image_width = image_data.shape
             logger.debug(f"Image dimensions: {image_width} x {image_height}")
