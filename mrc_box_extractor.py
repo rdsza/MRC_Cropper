@@ -81,7 +81,7 @@ def extract_box(
             logger.debug(f"Original data has shape {original_shape}")
             
             # Create a local variable for the data to avoid modifying mrc.data
-            data = mrc.data
+            image_data = mrc.data
             
             # Handle data dimensionality
             if len(original_shape) == 2:
@@ -91,15 +91,19 @@ def extract_box(
                 # Find singleton dimensions (dimensions with size 1)
                 singleton_axes = [i for i, size in enumerate(original_shape) if size == 1]
                 
-                if len(singleton_axes) > 0:
-                    # Squeeze all singleton dimensions
-                    data = data.squeeze()
-                    if len(data.shape) != 2:
+                if len(singleton_axes) == 1:
+                    # If exactly one singleton dimension, safe to squeeze all
+                    image_data = image_data.squeeze()
+                    logger.debug(f"Squeezed 3D data to 2D shape {image_data.shape}")
+                elif len(singleton_axes) > 1:
+                    # If multiple singleton dimensions, squeeze just one to ensure 2D result
+                    image_data = np.squeeze(image_data, axis=singleton_axes[0])
+                    logger.debug(f"Squeezed one singleton dimension to get shape {image_data.shape}")
+                    if len(image_data.shape) != 2:
                         raise ValueError(
                             f"Cannot convert 3D data to 2D image. Original shape: {original_shape}, "
-                            f"after squeeze: {data.shape}. Need exactly one singleton dimension."
+                            f"after partial squeeze: {image_data.shape}."
                         )
-                    logger.debug(f"Squeezed 3D data to 2D shape {data.shape}")
                 else:
                     raise ValueError(
                         f"Cannot convert 3D data to 2D image. Original shape: {original_shape}. "
@@ -110,7 +114,7 @@ def extract_box(
                     f"Unsupported data dimensionality: {original_shape}. Only 2D images or 3D volumes with one dimension of size 1 are supported."
                 )
             
-            image_height, image_width = data.shape
+            image_height, image_width = image_data.shape
             logger.debug(f"Image dimensions: {image_width} x {image_height}")
 
             # Calculate box boundaries
