@@ -12,13 +12,13 @@ import argparse
 import logging
 import os
 import sys
-from typing import Tuple
+from typing import Optional
 
 import numpy as np
 import mrcfile
 
 
-def setup_logging(log_level: str = "INFO", log_file: str = None) -> logging.Logger:
+def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
     """Set up logging configuration.
 
     Args:
@@ -75,13 +75,73 @@ def extract_box(
     logger.info(f"Opening MRC file: {mrc_path}")
     try:
         with mrcfile.open(mrc_path, mode="r", permissive=True) as mrc:
-            # Verify that this is a 2D image
-            if len(mrc.data.shape) != 2:
-                raise ValueError(
-                    f"Expected 2D image, but got {len(mrc.data.shape)}D data with shape {mrc.data.shape}"
-                )
-
-            image_height, image_width = mrc.data.shape
+            # Check if mrc.data is None
+            if mrc.data is None:
+                raise ValueError("MRC file does not contain data")
+                
+            # Check and handle data dimensionality
+            original_shape = mrc.data.shape
+            logger.debug(f"Original data has shape {original_shape}")
+            
+            # Initialize image_data
+            image_data = None
+            
+            # Handle data dimensionality
+            if len(original_shape) == 2:
+                # Already 2D, use mrc.data directly
+                logger.debug("Input is already a 2D image")
+                image_data = mrc.data
+            elif len(original_shape) == 3:
+                # Find singleton dimensions (dimensions with size 1)
+                singleton_axes = [i for i, size in enumerate(original_shape) if size == 1]
+                
+                if len(singleton_axes) == 1:
+                    # If exactly one singleton dimension, safe to squeeze all
+                    image_data = np.squeeze(mrc.data.copy())
+                    logger.debug(f"Squeezed 3D data to 2D shape {image_data.shape}")
+                elif len(singleton_axes) > 1:
+                    # Try squeezing each singleton dimension to see if it produces a 2D result
+                    image_data = mrc.data.copy()  # Initialize with data
+                    found_2d = False
+                    for axis in singleton_axes:
+                        test_data = np.squeeze(image_data, axis=axis)
+                        if len(test_data.shape) == 2:
+                            image_data = test_data
+                            found_2d = True
+                            logger.debug(f"Squeezed axis {axis} to get 2D shape {image_data.shape}")
+                            break
+                    
+                    if not found_2d:
+                        # Try squeezing all singleton dimensions
+                        test_data = np.squeeze(image_data)
+                        if len(test_data.shape) == 2:
+                            image_data = test_data
+                            found_2d = True
+                            logger.debug(f"Squeezed all singleton dimensions to get 2D shape {image_data.shape}")
+                    
+                    if not found_2d:
+                        raise ValueError(
+                            f"Cannot convert 3D data to 2D image. Original shape: {original_shape}. "
+                            f"No combination of squeeze operations produces a 2D result."
+                        )
+                else:
+                    raise ValueError(
+                        f"Cannot convert 3D data to 2D image. Original shape: {original_shape}. "
+                        f"No singleton dimensions found."
+                    )
+            else:
+                # For higher dimensionality, try squeezing all singleton dimensions
+                image_data = mrc.data.copy()  # Initialize with data
+                squeezed_data = np.squeeze(image_data)
+                if len(squeezed_data.shape) == 2:
+                    image_data = squeezed_data
+                    logger.debug(f"Squeezed {len(original_shape)}D data to 2D shape {image_data.shape}")
+                else:
+                    raise ValueError(
+                        f"Unsupported data dimensionality: {original_shape}. Cannot convert to 2D image."
+                    )
+            
+            image_height, image_width = image_data.shape
             logger.debug(f"Image dimensions: {image_width} x {image_height}")
 
             # Calculate box boundaries
@@ -97,7 +157,7 @@ def extract_box(
 
             # Check if box is completely outside the image
             if (
-                start_x >= image_width
+                start_x >=  image_width
                 or end_x <= 0
                 or start_y >= image_height
                 or end_y <= 0
@@ -122,7 +182,7 @@ def extract_box(
             box_end_y = box_start_y + (valid_end_y - valid_start_y)
 
             # Extract data and place in the box
-            padded_box[box_start_y:box_end_y, box_start_x:box_end_x] = mrc.data[
+            padded_box[box_start_y:box_end_y, box_start_x:box_end_x] = image_data[
                 valid_start_y:valid_end_y, valid_start_x:valid_end_x
             ]
 
@@ -233,6 +293,7 @@ def main():
         # Display box if requested
         if args.show:
             try:
+                # Optional dependency for visualization
                 import matplotlib.pyplot as plt
 
                 logger.info("Displaying extracted box")
