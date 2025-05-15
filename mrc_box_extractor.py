@@ -80,20 +80,18 @@ def extract_box(
             original_shape = mrc.data.shape
             logger.debug(f"Original data has shape {original_shape}")
             
-            # Create a local variable for the data to avoid modifying mrc.data
-            image_data = mrc.data.copy()
-            
             # Handle data dimensionality
             if len(original_shape) == 2:
-                # Already 2D, no need to squeeze
+                # Already 2D, use mrc.data directly
                 logger.debug("Input is already a 2D image")
+                image_data = mrc.data
             elif len(original_shape) == 3:
                 # Find singleton dimensions (dimensions with size 1)
                 singleton_axes = [i for i, size in enumerate(original_shape) if size == 1]
                 
                 if len(singleton_axes) == 1:
                     # If exactly one singleton dimension, safe to squeeze all
-                    image_data = np.squeeze(image_data)
+                    image_data = np.squeeze(mrc.data.copy())
                     logger.debug(f"Squeezed 3D data to 2D shape {image_data.shape}")
                 elif len(singleton_axes) > 1:
                     # Try squeezing each singleton dimension to see if it produces a 2D result
