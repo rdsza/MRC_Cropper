@@ -88,14 +88,23 @@ def extract_box(
                 # Already 2D, no need to squeeze
                 logger.debug("Input is already a 2D image")
             elif len(original_shape) == 3:
-                # Try to squeeze 3D data to 2D
-                data = data.squeeze(axis=0)
-                if len(data.shape) != 2:
+                # Find singleton dimensions (dimensions with size 1)
+                singleton_axes = [i for i, size in enumerate(original_shape) if size == 1]
+                
+                if len(singleton_axes) > 0:
+                    # Squeeze all singleton dimensions
+                    data = data.squeeze()
+                    if len(data.shape) != 2:
+                        raise ValueError(
+                            f"Cannot convert 3D data to 2D image. Original shape: {original_shape}, "
+                            f"after squeeze: {data.shape}. Need exactly one singleton dimension."
+                        )
+                    logger.debug(f"Squeezed 3D data to 2D shape {data.shape}")
+                else:
                     raise ValueError(
-                        f"Cannot convert 3D data to 2D image. Original shape: {original_shape}, "
-                        f"after squeeze: {data.shape}. One dimension must be of size 1."
+                        f"Cannot convert 3D data to 2D image. Original shape: {original_shape}. "
+                        f"No singleton dimensions found."
                     )
-                logger.debug(f"Squeezed 3D data to 2D shape {data.shape}")
             else:
                 raise ValueError(
                     f"Unsupported data dimensionality: {original_shape}. Only 2D images or 3D volumes with one dimension of size 1 are supported."
